@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BoNT Procedural Planner</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+--bg:#0F1117;--card:#1A1D27;--input:#13161F;
+--cyan:#4FC3F7;--green:#81C784;--red:#EF5350;--amber:#FFB74D;
+--text:#E8EAF6;--muted:#78909C;--border:#2A2D3E;
+--radius:8px;--radius-sm:6px;
+}
+body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,'Segoe UI',sans-serif;font-size:13px;line-height:1.5;min-height:100vh}
+a{color:var(--cyan);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* HEADER */
+.header{position:sticky;top:0;z-index:100;background:#14161E;border-bottom:1px solid var(--border);padding:10px 20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+.header-left{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.header-title{font-size:20px;font-weight:600;color:var(--cyan)}
+.header-sub{font-size:11px;color:var(--muted);letter-spacing:.04em}
+.header-right{font-size:11px;color:var(--muted);text-align:right}
+.header-badge{display:inline-block;background:var(--cyan);color:#0F1117;font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;margin-left:8px}
+.header-actions{display:flex;gap:8px;align-items:center}
+.btn-print{background:transparent;border:1px solid var(--border);color:var(--muted);padding:4px 12px;border-radius:var(--radius-sm);cursor:pointer;font-size:11px}
+.btn-print:hover{border-color:var(--cyan);color:var(--cyan)}
+
+/* LAYOUT */
+.layout{display:flex;min-height:calc(100vh - 50px)}
+.panel-left{width:38%;min-width:300px;padding:16px;overflow-y:auto;border-right:1px solid var(--border)}
+.panel-right{flex:1;padding:16px;overflow-y:auto}
+@media(max-width:767px){
+.layout{flex-direction:column}
+.panel-left,.panel-right{width:100%;min-width:0;border-right:none}
+}
+
+/* SECTION HEADERS */
+.sec-hdr{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:16px 0 8px;display:flex;align-items:center;gap:6px}
+.sec-hdr .count{background:var(--cyan);color:#0F1117;font-size:10px;font-weight:700;width:18px;height:18px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center}
+
+/* INLINE FIELDS */
+.inline-row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.field-label{font-size:11px;color:var(--muted);margin-bottom:3px}
+.toggle-group{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden}
+.toggle-btn{padding:5px 14px;font-size:12px;background:var(--input);color:var(--muted);border:none;cursor:pointer;transition:background .15s,color .15s}
+.toggle-btn.active{background:var(--cyan);color:#0F1117;font-weight:600}
+select{background:var(--input);color:var(--text);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;font-family:inherit}
+.note-sm{font-size:11px;color:var(--muted);margin-top:4px;line-height:1.4}
+
+/* CHIP CHECKBOXES */
+.chip-grid{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px}
+.chip{position:relative;cursor:pointer}
+.chip input{position:absolute;opacity:0;width:0;height:0}
+.chip span{display:inline-block;padding:5px 12px;border:1px solid var(--border);border-radius:20px;font-size:12px;color:var(--muted);transition:all .15s;user-select:none}
+.chip input:checked+span{background:var(--cyan);color:#0F1117;border-color:var(--cyan);font-weight:500}
+.chip input:focus-visible+span{outline:2px solid var(--cyan);outline-offset:2px}
+.chip:hover span{border-color:#4a4d5e}
+
+/* FLAG CHECKBOXES */
+.flag-list{display:flex;flex-direction:column;gap:6px}
+.flag{display:flex;align-items:flex-start;gap:8px;cursor:pointer;font-size:12px;color:#e0a0a0}
+.flag input{accent-color:var(--red);margin-top:2px;flex-shrink:0}
+
+/* GENERATE */
+.btn-gen{width:100%;padding:12px;background:var(--cyan);color:#0F1117;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;letter-spacing:.03em;transition:transform .1s,box-shadow .15s}
+.btn-gen:hover{box-shadow:0 0 16px rgba(79,195,247,.3)}
+.btn-gen:active{transform:scale(.98)}
+.btn-gen.shake{animation:shake .4s}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+.gen-err{color:var(--red);font-size:12px;margin-top:4px;display:none}
+.clear-link{text-align:center;margin-top:8px;font-size:12px}
+
+/* PLACEHOLDER */
+.placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;height:60vh;color:var(--muted);text-align:center;gap:10px}
+.placeholder .icon{font-size:48px;opacity:.4}
+
+/* ALERTS */
+.alert-bar{padding:10px 14px;border-radius:var(--radius-sm);margin-bottom:8px;font-size:12px;font-weight:500;line-height:1.5;display:flex;align-items:flex-start;gap:8px}
+.alert-bar.red{background:rgba(239,83,80,.12);border:1px solid rgba(239,83,80,.3);color:#ffb4b4}
+.alert-bar.amber{background:rgba(255,183,77,.1);border:1px solid rgba(255,183,77,.25);color:#ffe0a0}
+.alert-icon{flex-shrink:0;font-size:14px}
+
+/* CARDS */
+.results-wrap{opacity:0;transition:opacity .2s}
+.results-wrap.show{opacity:1}
+.collapse-links{font-size:11px;color:var(--muted);margin-bottom:10px;display:flex;gap:12px}
+.collapse-links a{cursor:pointer}
+
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);margin-bottom:12px;overflow:hidden}
+.card-head{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--border);cursor:pointer}
+.card-head:hover{background:rgba(79,195,247,.04)}
+.card-name{font-size:14px;font-weight:600;color:var(--cyan)}
+.region-badge{font-size:9px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;padding:2px 8px;border-radius:10px;background:rgba(79,195,247,.12);color:var(--cyan)}
+.card-body{display:none;padding:0}
+.card.open .card-body{display:block}
+
+/* TABS */
+.tab-row{display:flex;border-bottom:1px solid var(--border);overflow-x:auto}
+.tab-btn{padding:8px 14px;font-size:11px;font-weight:600;color:var(--muted);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;white-space:nowrap;transition:color .15s,border-color .15s}
+.tab-btn:hover{color:var(--text)}
+.tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+.tab-content{display:none;padding:14px 16px;font-size:12px;line-height:1.7}
+.tab-content.active{display:block}
+.tab-content ul{padding-left:18px}
+.tab-content li{margin-bottom:4px}
+.tab-content ol{padding-left:18px}
+.tab-content ol li{margin-bottom:6px}
+
+/* mini table */
+.dose-tbl{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+.dose-tbl th,.dose-tbl td{padding:6px 8px;border:1px solid var(--border);text-align:left}
+.dose-tbl th{background:var(--input);color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.05em}
+.dose-tbl tr.hl{background:rgba(79,195,247,.08)}
+.dose-tbl tr.dim{opacity:.45}
+
+/* misc */
+.cyan-box{background:rgba(79,195,247,.08);border:1px solid rgba(79,195,247,.2);border-radius:var(--radius-sm);padding:8px 12px;margin:8px 0;font-size:12px;color:var(--cyan)}
+.green-banner{background:rgba(129,199,132,.1);border:1px solid rgba(129,199,132,.25);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:8px;font-size:12px;color:var(--green)}
+.amber-hdr{color:var(--amber);font-weight:600;font-size:12px;margin:8px 0 4px;text-transform:uppercase;letter-spacing:.05em}
+.red-hdr{color:var(--red);font-weight:600;font-size:12px;margin:8px 0 4px;text-transform:uppercase;letter-spacing:.05em}
+.vessel-item,.comp-item{margin-bottom:6px}
+.badge-muscle{display:inline-block;background:rgba(79,195,247,.12);color:var(--cyan);padding:2px 8px;border-radius:10px;font-size:11px;margin:2px}
+.depth-chip{display:inline-block;background:var(--input);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 10px;font-family:'Courier New',monospace;font-size:12px;color:var(--text);margin:4px 0}
+.summary-tbl{width:100%;border-collapse:collapse;font-size:12px}
+.summary-tbl th,.summary-tbl td{padding:6px 10px;border:1px solid var(--border);text-align:left}
+.summary-tbl th{background:var(--input);color:var(--muted);font-size:10px;text-transform:uppercase}
+
+/* PRINT */
+@media print{
+body{background:#fff;color:#000;font-size:11px}
+.header,.panel-left,.collapse-links,.btn-print,.header-actions{display:none!important}
+.layout{display:block}
+.panel-right{width:100%;padding:0}
+.card{break-inside:avoid;border-color:#ccc;background:#fff}
+.card-body{display:block!important}
+.tab-row{display:none!important}
+.tab-content{display:block!important;border-top:1px solid #ddd}
+.card-name{color:#1a1a1a}
+.region-badge{color:#555;background:#eee}
+.alert-bar.red{background:#fee;border-color:#faa;color:#900}
+.alert-bar.amber{background:#fff8e1;border-color:#ffc;color:#7a5500}
+.cyan-box{background:#e8f7ff;border-color:#aadcf0;color:#0a6a8a}
+.green-banner{background:#eaf7ea;border-color:#a0d8a0;color:#2a6a2a}
+.dose-tbl tr.hl{background:#e8f7ff}
+.dose-tbl tr.dim{opacity:.5}
+.results-wrap{opacity:1!important}
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+ <div class="header-left">
+  <div class="header-title">BoNT Planner</div>
+  <div class="header-sub">Pre-Procedure Quick Reference</div>
+  <span class="header-badge" id="countBadge">0 areas</span>
+ </div>
+ <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+  <div class="header-right">Dr. Bukhari — Aesthetic Dermatology, Riyadh</div>
+  <div class="header-actions"><button class="btn-print" onclick="window.print()">🖨 Print Plan</button></div>
+ </div>
+</div>
+
+<div class="layout">
+
+<!-- LEFT PANEL -->
+<div class="panel-left" id="leftPanel">
+
+<!-- A: Patient Profile -->
+<div class="sec-hdr">Patient Profile</div>
+<div class="inline-row">
+ <div>
+  <div class="field-label">Sex</div>
+  <div class="toggle-group">
+   <button class="toggle-btn active" data-val="female" onclick="setSex(this)">Female</button>
+   <button class="toggle-btn" data-val="male" onclick="setSex(this)">Male</button>
+  </div>
+ </div>
+ <div>
+  <div class="field-label">Ethnicity</div>
+  <select id="ethSelect">
+   <option value="caucasian">Caucasian</option>
+   <option value="asian">Asian / Gulf Arab</option>
+   <option value="other">Other</option>
+  </select>
+ </div>
+ <div>
+  <div class="field-label">Toxin</div>
+  <select id="toxinSelect">
+   <option value="botox">Botox® / Xeomin®</option>
+   <option value="dysport">Dysport®</option>
+   <option value="neuronox">Neuronox</option>
+  </select>
+ </div>
+</div>
+<div class="note-sm">Asian/Gulf Arab applies lower dose protocols and inferior modiolus adjustments where applicable.</div>
+
+<!-- B: Treatment Areas -->
+<div class="sec-hdr">Upper Face <span class="count" id="cntUpper">0</span></div>
+<div class="chip-grid" data-group="upper">
+ <label class="chip"><input type="checkbox" value="forehead"><span>Forehead lines</span></label>
+ <label class="chip"><input type="checkbox" value="glabella"><span>Frown lines / Glabella</span></label>
+ <label class="chip"><input type="checkbox" value="brow_lift"><span>Chemical brow lift</span></label>
+ <label class="chip"><input type="checkbox" value="crows_feet"><span>Crow's feet</span></label>
+ <label class="chip"><input type="checkbox" value="bunny_lines"><span>Bunny lines</span></label>
+ <label class="chip"><input type="checkbox" value="temporalis"><span>Temporal slimming</span></label>
+</div>
+
+<div class="sec-hdr">Midface <span class="count" id="cntMid">0</span></div>
+<div class="chip-grid" data-group="mid">
+ <label class="chip"><input type="checkbox" value="gummy_smile"><span>Gummy smile</span></label>
+ <label class="chip"><input type="checkbox" value="nasal_flare"><span>Nasal flare</span></label>
+ <label class="chip"><input type="checkbox" value="nasal_tip"><span>Drooping nasal tip</span></label>
+ <label class="chip"><input type="checkbox" value="asymmetric_smile"><span>Asymmetric smile</span></label>
+</div>
+
+<div class="sec-hdr">Lower Face <span class="count" id="cntLower">0</span></div>
+<div class="chip-grid" data-group="lower">
+ <label class="chip"><input type="checkbox" value="perioral"><span>Perioral lines</span></label>
+ <label class="chip"><input type="checkbox" value="dao"><span>Depressed mouth corners</span></label>
+ <label class="chip"><input type="checkbox" value="mentalis"><span>Cobblestone chin</span></label>
+ <label class="chip"><input type="checkbox" value="masseter"><span>Masseter slimming</span></label>
+</div>
+
+<div class="sec-hdr">Neck <span class="count" id="cntNeck">0</span></div>
+<div class="chip-grid" data-group="neck">
+ <label class="chip"><input type="checkbox" value="platysma_bands"><span>Platysmal bands</span></label>
+ <label class="chip"><input type="checkbox" value="nefertiti"><span>Nefertiti jawline lift</span></label>
+</div>
+
+<!-- C: Clinical Flags -->
+<div class="sec-hdr">Clinical Flags</div>
+<div class="flag-list">
+ <label class="flag"><input type="checkbox" id="flagNaive"> Toxin-naïve (first treatment)</label>
+ <label class="flag"><input type="checkbox" id="flagLongLip"> Long upper lip (columella–vermilion &gt;1.8 cm)</label>
+ <label class="flag"><input type="checkbox" id="flagRisorius"> Prominent risorius (ears move on broad smile)</label>
+ <label class="flag"><input type="checkbox" id="flagSubmental"> Significant submental fat</label>
+ <label class="flag"><input type="checkbox" id="flagSurgery"> Prior facial surgery / altered tissue planes</label>
+ <label class="flag"><input type="checkbox" id="flagPerioral"> High perioral functional demand (musician, speaker)</label>
+ <label class="flag"><input type="checkbox" id="flagAsianMod"> Asian modiolus anatomy confirmed</label>
+</div>
+
+<!-- D: Generate -->
+<div style="margin-top:20px">
+ <button class="btn-gen" id="genBtn" onclick="generate()">GENERATE PROCEDURAL PLAN</button>
+ <div class="gen-err" id="genErr">Select at least one treatment area.</div>
+ <div class="clear-link"><a href="#" onclick="clearAll();return false">Clear all</a></div>
+</div>
+
+</div><!-- /panel-left -->
+
+<!-- RIGHT PANEL -->
+<div class="panel-right" id="rightPanel">
+ <div class="placeholder" id="pholder">
+  <div class="icon">🔬</div>
+  <div>Select treatment areas and generate a plan<br>to see procedural protocols.</div>
+ </div>
+ <div class="results-wrap" id="resultsWrap">
+  <div class="collapse-links"><a onclick="toggleAll(true)">Expand all</a><a onclick="toggleAll(false)">Collapse all</a></div>
+  <div id="alertsContainer"></div>
+  <div id="cardsContainer"></div>
+  <div id="summaryContainer"></div>
+ </div>
+</div>
+
+</div><!-- /layout -->
+
+<script>
+// ═══════════════════════════════════════════════════════════
+// CLINICAL DATA
+// ═══════════════════════════════════════════════════════════
+const DATA={areas:[
+{id:"forehead",name:"Forehead Lines (Frontalis)",region:"upper",
+targets:["Frontalis (sole brow elevator)"],
+depth:"Intramuscular or intradermal (comparable outcomes)",
+landmark:"Inject ≥1–2 cm above orbital rim. Never below C-line.",
+ethnicityNote:"Asians require lower doses: 2–10 U Botox.",
+doses:{
+ botox:{female:"5–10 U",male:"10–20 U",note:"Trend: customize; FDA standard: 20 U / 5 sites"},
+ dysport:{female:"40–50 s.U",male:"50–70 s.U",note:"Range 40–70 s.U"},
+ neuronox:{female:"5–10 U",male:"10–20 U",note:"Same as Botox"}
+},
+technique:[
+"Identify C-line (convergence line) during animation — never inject below it.",
+"Choose pattern: M-shape (standard), V-shape (women, medial contraction), One21 (Xeomin; palpation-based 21-point grid).",
+"M-shape: 3 midline + 2 superior-lateral points.",
+"V-shape: avoid in males — causes feminizing arch; Mephisto risk if exaggerated.",
+"One21 inferior limit line (0.5–1 U max per site): Medial to mid-pupillary → arch + lateral lift; At mid-pupillary → flatten brow; Lateral to mid-pupillary → drop lateral brow.",
+"Depth: IM or intradermal; supraperiosteal for low-diffusion toxins.",
+"Asymmetry correction: ~2 U above higher brow, 0.5–1 cm below original level."
+],
+vessels:[
+"Superficial temporal artery runs laterally — avoid high-volume lateral injections. ⚑ Not formally mapped.",
+"Supraorbital + supratrochlear arteries at supraorbital rim — block rim with non-injecting hand; stay ≥1–2 cm above orbital rim."
+],
+complications:[
+{name:"Brow ptosis",cause:"Below C-line / overdose",management:"Wait to resolve; treat glabella if omitted"},
+{name:"Eyelid ptosis",cause:"Diffusion to levator palpebrae",management:"Upneeq / Iopidine drops TID; severe: Pyridostigmine 60 mg TID–QID"},
+{name:"Mephisto/Spock sign",cause:"Medial-only treatment",management:"2–4 U to hyperelevated lateral frontalis at 2-wk f/u"},
+{name:"Frozen face",cause:"Overdose",management:"Wait; lower future dose"},
+{name:"Headache",cause:"~7% incidence",management:"Supportive, self-resolving"}
+],
+crossLinks:["glabella"]
+},
+
+{id:"glabella",name:"Frown Lines / Glabella",region:"upper",
+targets:["Procerus","Corrugator supercilii — medial head (deep)","Corrugator supercilii — lateral tail (superficial)"],
+depth:"Procerus + medial corrugator: DEEP supraperiosteal. Lateral tail: SUPERFICIAL intradermal.",
+landmark:"Stay ≥0.5–1.0 cm above orbital rim. Aim upward + lateral 30°.",
+ethnicityNote:"Asian: 10–14 U Botox. Caucasian: 10–30 U.",
+doses:{
+ botox:{female:"20 U standard",male:"Up to 80 U for duration",note:"CSM: 3 U/side F, 4 U/side M"},
+ dysport:{female:"50–70 s.U",male:"60–80 s.U",note:"Range 30–70 s.U"},
+ neuronox:{female:"20 U standard",male:"Up to 80 U for duration",note:"Same as Botox"}
+},
+technique:[
+"5-point standard: procerus ×1, corrugator ×2 per side.",
+"Direction: aim UPWARD and LATERAL at 30°, bevel UP.",
+"Block inner orbital rim with non-injecting hand throughout injection.",
+"Stand on CONTRALATERAL side (e.g., stand on patient's right to inject their left).",
+"Procerus + medial corrugator: insert to frontal bone, withdraw slightly, inject (supraperiosteal).",
+"Lateral corrugator tail: intradermal/superficial subdermal only — tail inserts into dermis.",
+"Inject at EYEBROW LEVEL (not 1 cm above) to spare medial frontalis."
+],
+vessels:[
+"Supratrochlear artery: medial orbit, runs superiorly. Palpate supraorbital notch/foramen pre-injection.",
+"Supraorbital artery: exits supraorbital foramen/notch. Physical rim block is primary safeguard.",
+"⚑ No formal vessel avoidance diagram in reference data."
+],
+complications:[
+{name:"Blepharoptosis",cause:"Toxin diffusion to levator palpebrae",management:"Upneeq / Iopidine + Pyridostigmine; resolves 2–6 weeks"},
+{name:"Mephisto brow",cause:"Medial frontalis paralyzed; lateral over-fires",management:"2–4 U to hyperelevated lateral frontalis at 2-wk f/u"},
+{name:"Brow ptosis",cause:"Excessive frontalis weakening",management:"Supportive; wait"},
+{name:"Bunny lines",cause:"Compensatory LLSAN activity",management:"Add micro-dose at inferior medial canthus"},
+{name:"Diplopia",cause:"Deep medial injection",management:"Refer ophthalmology"}
+],
+crossLinks:["forehead","brow_lift"]
+},
+
+{id:"brow_lift",name:"Chemical Brow Lift",region:"upper",
+targets:["Orbicularis oculi — lateral tail (Component 2)","Frontalis upper-lateral fibers via Hering's Law (Component 3)","Corrugator bodies — medial release (Component 1, via glabella)"],
+depth:"Lateral OOc: intradermal bleb. Hering's point: intramuscular. Corrugator: deep supraperiosteal.",
+landmark:"Lateral OOc: 5–7 mm superolateral to orbital rim. Hering's point: 2.5 cm above orbital rim, medial to temporal fusion line.",
+ethnicityNote:null,
+doses:{
+ botox:{female:"Comp 2: 3–5 U/side; Comp 3: 3 U",male:"Same",note:"Corrugator: see Glabella section"},
+ dysport:{female:"Comp 2: 10 s.U/side",male:"Same",note:"Corrugator: 5–10 s.U/side"},
+ neuronox:{female:"Comp 2: 3–5 U/side; Comp 3: 3 U",male:"Same",note:"Same as Botox"}
+},
+technique:[
+"THREE-COMPONENT SYSTEM — all must be coordinated:",
+"Component 1 — Medial release (glabella): Deep injection into corrugator bodies. Releases medial brow downward pull. (See Glabella card.)",
+"Component 2 — Lateral tail release: Intradermal bleb 5–7 mm SUPEROLATERAL to orbital rim. Releases lateral brow downward pull.",
+"Component 3 — Hering's Law point: 3 U IM into upper-lateral frontalis, medial to temporal fusion line, 2.5 cm above orbital rim. Brain hyper-stimulates remaining lower-lateral fibers → compensatory lateral lift. DO NOT OVERCORRECT → brow ptosis.",
+"One21 inferior limit line (0.5–1 U per site — MINIMAL dose): medial = arch + lift; at mid-pupillary = flatten; lateral = drop.",
+"NEVER do Component 2 without Component 1 — produces Mephisto deformity."
+],
+vessels:[
+"Angular artery in lateral orbital zone. ⚑ Not formally mapped. Intradermal bleb technique is primary safeguard.",
+"Zygomaticofacial artery exits foramen in lateral orbital region. ⚑ Not formally mapped."
+],
+complications:[
+{name:"Mephisto/Spock deformity",cause:"Lateral release without medial release",management:"Inject medial corrugators; cannot do lateral-only"},
+{name:"Brow ptosis",cause:"Hering's point dose too high",management:"Wait; conservative future dosing"},
+{name:"Asymmetry",cause:"Uneven placement",management:"Correct at 2-wk f/u with micro-dose"}
+],
+crossLinks:["glabella","crows_feet"]
+},
+
+{id:"crows_feet",name:"Crow's Feet",region:"upper",
+targets:["Orbital portion of orbicularis oculi (OOc) — lateral fibers"],
+depth:"Intracutaneous / superficial subdermal. MAX 2–3 mm depth. Create visible bleb.",
+landmark:"3-point arc: P1 = 1.5–2 cm lateral to canthus. P2 = 1–1.5 cm above P1 angled 30° medially. P3 = 1–1.5 cm below P1 angled 30° medially.",
+ethnicityNote:"Asian: do NOT inject >3 cm lateral to canthus (OOc extends only 3.1 cm). Total dose 4–8 U Botox.",
+doses:{
+ botox:{female:"5–10+ U/side",male:"Up to 30 U total",note:"Naïve: start 3–4 U/site. If >14 U/side: give excess at 1–2 wk f/u"},
+ dysport:{female:"20–50 s.U/side",male:"30 s.U/side",note:"60% response at 30 s.U/side at max smile"},
+ neuronox:{female:"5–10 U/side",male:"Up to 15 U/side",note:""}
+},
+technique:[
+"DIAGNOSTIC SMILE TEST FIRST: Squinting rhytides → OOc → treat. Full-smile rhytides → ZMj → DO NOT TREAT (lip ptosis risk).",
+"Point needle LATERALLY, away from globe. Bevel UP. Oblique/tangential angle to tent skin.",
+"Depth maximum 2–3 mm. Create visible superficial bleb at each point.",
+"3-point arc protocol: P1 central (1.5–2 cm lateral to canthus), P2 superior (30° medial), P3 inferior (30° medial).",
+"NEVER inject below superior zygomatic arch — ZMj danger zone below this line.",
+"Do not inject while patient is smiling.",
+"For young women with prominent malar eminence: omit P3 (inferior) or use micro-dose to prevent shelf-like bunching.",
+"Add prophylactic 1–2 U at inferior medial canthus to prevent compensatory bunny lines."
+],
+vessels:[
+"Zygomaticofacial artery exits foramen in lateral orbital region. ⚑ Not formally mapped. Bleb technique at max 2–3 mm is primary safeguard.",
+"Avoid superior zygomatic arch — ZMj lies below. Diffusion → lip ptosis lasting up to 4 months."
+],
+complications:[
+{name:"Lip ptosis + asymmetric smile",cause:"ZMj/ZMi diffusion (below zygomatic arch)",management:"No reversal; self-limiting 3–4 months"},
+{name:"Shelf-like bunching",cause:"Zyg. pushes cheek vs flattened lateral canthus",management:"Omit inferior site in young women with malar eminence"},
+{name:"Eyelid ptosis",cause:"Injection not strictly lateral to orbital rim",management:"Upneeq / Iopidine drops"},
+{name:"Brow ptosis",cause:"Superior injection within 1 cm of brow",management:"Supportive"},
+{name:"Bruising",cause:"Vessel strike (25% incidence)",management:"Firm pressure ×5 min; 31–33G needle; stretch skin under strong light"},
+{name:"Dry eye / eyelid edema",cause:"OOc weakening in LASIK / dry-eye patients",management:"Screen pre-procedure"}
+],
+crossLinks:["bunny_lines"]
+},
+
+{id:"bunny_lines",name:"Bunny Lines",region:"upper",
+targets:["LLSAN — Levator labii superioris alaeque nasi (primary)","Transverse nasalis (secondary)"],
+depth:"SUPERFICIAL — subdermal / intracutaneous only.",
+landmark:"Geometric intersection: horizontal at RHINION × vertical from MEDIAL CANTHUS = injection point each side.",
+ethnicityNote:null,
+doses:{
+ botox:{female:"2–3 U/side",male:"2–3 U/side",note:"Do NOT fully eradicate — LLSAN is vital lip elevator"},
+ dysport:{female:"~6–9 s.U/side",male:"~6–9 s.U/side",note:"1:3 conversion"},
+ neuronox:{female:"2–3 U/side",male:"2–3 U/side",note:""}
+},
+technique:[
+"Confirm true bunny lines (not radix lines → procerus; not medial scrunch → transverse nasalis).",
+"Geometric method: draw horizontal at rhinion (bony-cartilaginous junction); draw vertical from medial canthus → inject at intersection.",
+"Block inner ORBITAL RIM with non-injecting hand to prevent medial diffusion toward eyelid.",
+"Depth: superficial subdermal / intracutaneous only.",
+"DO NOT fully paralyze LLSAN — partial relaxation only. Complete paralysis = upper lip ptosis.",
+"If treating bunny lines + crow's feet in same session: coordinate LLSAN dose."
+],
+vessels:[
+"Angular artery (terminal facial artery branch) runs lateral to nasal sidewall within LLSAN territory. ⚑ Not formally mapped. Superficial injection is primary safeguard."
+],
+complications:[
+{name:"Upper lip ptosis",cause:"Full LLSAN paralysis",management:"Partial paresis only; no reversal; wait 3–4 months"},
+{name:"Asymmetric smile",cause:"Asymmetric dose",management:"Micro-dose correction at 2-wk f/u"}
+],
+crossLinks:["crows_feet","gummy_smile","nasal_flare","nasal_tip"]
+},
+
+{id:"temporalis",name:"Temporal Slimming",region:"upper",
+targets:["Temporalis — upper half (most protrusive zone)"],
+depth:"DEEP intramuscular — bone contact + retrograde injection.",
+landmark:"Safe zone: superior to orbital rim line, anterior to tragus vertical, ≥45 mm above zygomatic arch. Below 45 mm = tendon, not muscle.",
+ethnicityNote:"Asian patients frequently request aggressive slimming (40 U/side).",
+doses:{
+ botox:{female:"20–40 U/side",male:"20–40 U/side",note:"Start conservative 20 U; titrate at f/u. 4–6 injection points."},
+ dysport:{female:"60–120 s.U/side",male:"60–120 s.U/side",note:""},
+ neuronox:{female:"20–40 U/side",male:"20–40 U/side",note:""}
+},
+technique:[
+"Map safe zone before injection: above orbital rim transverse line, anterior to tragus, ≥45 mm above zygomatic arch.",
+"Danger zone: immediately behind orbital rim → temporal hollowing.",
+"Depth: insert needle until tip contacts temporal bone (periosteum), then retrograde injection while withdrawing.",
+"Rationale for retrograde: keeps toxin in muscle belly; superficial fascia injection = diffusion without atrophy.",
+"Distribute 4–6 points in upper half of muscle only.",
+"Start at 20 U/side for first session; titrate at follow-up."
+],
+vessels:[
+"Middle temporal artery (branch of superficial temporal artery) courses between superficial and deep temporal fascia. ⚑ Not formally mapped. Bone-contact + retrograde technique is primary safeguard."
+],
+complications:[
+{name:"Temporal hollowing",cause:"Overdose or injection near orbital rim",management:"Filler correction if persistent; conservative starting dose"},
+{name:"Exaggerated cheekbones",cause:"Secondary to temporal hollowing",management:"Manage expectations; filler later"},
+{name:"Masticatory weakness",cause:"Overdose",management:"Adjust dose based on muscle mass"},
+{name:"TMJ adaptive pain",cause:"Altered mechanics (esp. if co-treating masseter)",management:"Monitor; NSAIDs"},
+{name:"Bone resorption",cause:"Long-term repetitive treatments",management:"Inform patient; limit frequency"}
+],
+crossLinks:["masseter"]
+},
+
+{id:"gummy_smile",name:"Gummy Smile",region:"mid",
+targets:["LLSAN — primary","LLS (Levator labii superioris) — severe cases","ZMi (Zygomaticus minor) — Yonsei point only"],
+depth:"Conservative (LLSAN): intradermal/shallow. Yonsei point: deep intramuscular.",
+landmark:"Conservative: just lateral to UPPER MARGIN of nasal ala. Yonsei point: 1 cm lateral to nasal ala at nasal base level.",
+ethnicityNote:"Modiolus is lower in Asian/Gulf Arab patients. Adjust Yonsei point inferiorly if using multi-muscle approach.",
+doses:{
+ botox:{female:"Conservative: 1–2 U/side. Yonsei: 2 U/side",male:"Same",note:"Naïve: START at 1 U/side conservative only. Reassess at 2 weeks."},
+ dysport:{female:"Conservative: 2.5–5 s.U/side. Yonsei: 5 s.U/side",male:"Same",note:"1:2.5 or 1:3 ratio"},
+ neuronox:{female:"Conservative: 1–2 U/side. Yonsei: 2 U/side",male:"Same",note:"Same as Botox"}
+},
+technique:[
+"MEASURE upper lip length first: columella to vermilion. If >1.8 cm → CONTRAINDICATED.",
+"Toxin-naïve patients: conservative approach ONLY (1 U/side LLSAN). Never start with Yonsei.",
+"Conservative: intradermal injection just lateral to upper margin of nasal ala.",
+"Severe cases only — Yonsei point: 1 cm lateral to nasal ala at nasal base level, deep IM, 2 U/side. Targets LLSAN + LLS + ZMi simultaneously.",
+"Do not treat orbicularis oris for gummy smile — sphincter dysfunction risk.",
+"Reassess at 2-wk f/u. If minor asymmetry: 0.5–1 U micro-dose to stronger side."
+],
+vessels:[
+"Angular artery and facial artery branches course in upper nasolabial sulcus. ⚑ Not formally mapped. Aspirate or stay strictly subcutaneous/intradermal."
+],
+complications:[
+{name:"Upper lip ptosis + philtrum flattening",cause:"Over-treatment of LLS/ZMi or central spread",management:"No reversal; self-limiting 3–4 months"},
+{name:"Functional impairment (p/b, straw)",cause:"LLSAN/LLS paralysis",management:"CNS accommodates in ~2 weeks; reassure"},
+{name:"Asymmetric smile",cause:"Asymmetric distribution or ZMj/risorius spread",management:"0.5–1 U micro-dose to stronger side at 2-wk f/u"}
+],
+crossLinks:["bunny_lines","nasal_flare","nasal_tip"]
+},
+
+{id:"nasal_flare",name:"Nasal Flare",region:"mid",
+targets:["Dilator naris (alar portion of nasalis)","LLSAN medial fibers — only if LLSAN drives flaring"],
+depth:"SUBCUTANEOUS — muscles thin and integrated with skin.",
+landmark:"Center of alar rim (most common). Or: middle of ala nasi. Or: lower nasal wing.",
+ethnicityNote:null,
+doses:{
+ botox:{female:"2–4 U/side (standard). Up to 6 U/side dilator naris.",male:"Same",note:"LLSAN addition: 2–3 U/side if LLSAN-driven"},
+ dysport:{female:"6–12 s.U/side",male:"Same",note:"1:3 conversion"},
+ neuronox:{female:"2–4 U/side",male:"Same",note:"Same as Botox"}
+},
+technique:[
+"MEASURE nasal spine to Cupid's bow distance. If >1.8 cm → CONTRAINDICATED.",
+"Single subcutaneous injection per side at center of alar rim or middle of ala.",
+"For maximum precision: inject at junction of dilator naris + dilator naris vestibularis + LLSAN.",
+"If flaring worsened by LLSAN: add 2–3 U/side to LLSAN at standard LLSAN location.",
+"Depth strictly subcutaneous — thin dermally-integrated muscles require superficial approach.",
+"Duration of effect: 3–4 months."
+],
+vessels:[
+"Lateral nasal artery branches in alar region. ⚑ Not formally mapped. Subcutaneous injection is primary safeguard."
+],
+complications:[
+{name:"Upper lip ptosis",cause:"LLSAN/elevator diffusion",management:"No reversal; wait 3–4 months"},
+{name:"Philtrum elongation",cause:"Elevator diffusion",management:"Avoid if nasal spine–Cupid bow >1.8 cm"},
+{name:"Speech/pronunciation difficulty",cause:"Elevator spread",management:"Self-limiting"}
+],
+crossLinks:["gummy_smile","bunny_lines","nasal_tip"]
+},
+
+{id:"nasal_tip",name:"Drooping Nasal Tip",region:"mid",
+targets:["Depressor septi nasi (primary)","LLSAN — only if smile-induced drooping"],
+depth:"Depressor septi nasi: DEEP intramuscular toward nasal spine. LLSAN: superficial/intradermal.",
+landmark:"Primary: base of columella, inject vertically toward nasal spine. Subnasale technique: 4 U at subnasale + bilateral ala = 12 U total.",
+ethnicityNote:null,
+doses:{
+ botox:{female:"1.5 U/side (3 U total) OR 2–4 U single midline",male:"Same",note:"Subnasale protocol: 12 U total. LLSAN addition: 2 U/side only if smile-induced."},
+ dysport:{female:"3–10 s.U at base of columella",male:"Same",note:""},
+ neuronox:{female:"1.5 U/side (3 U total) OR 2–4 U midline",male:"Same",note:"Same as Botox"}
+},
+technique:[
+"DYNAMIC ASSESSMENT MANDATORY: assess while patient speaks and smiles to confirm depressor septi nasi hyperactivity.",
+"MEASURE nasal spine to Cupid's bow. If >1.8 cm → CONTRAINDICATED.",
+"Apply topical anesthesia (lidocaine/prilocaine cream) ≥30 min before — VERY PAINFUL site.",
+"Primary injection: deep IM at base of columella, needle oriented vertically toward nasal spine.",
+"Subnasale protocol: 4 U at subnasale + additional units bilateral ala = 12 U total.",
+"LLSAN addition (only if drooping worsens on smiling): 2 U/side intradermal at LLSAN location."
+],
+vessels:[
+"Columellar artery runs at base of columella. ⚑ Not formally mapped despite being explicitly painful site. Aspirate; inject precisely."
+],
+complications:[
+{name:"Upper lip ptosis",cause:"High risk in long upper lips or reduced vermilion show",management:"No reversal; wait 3–4 months"},
+{name:"Philtrum elongation",cause:"Depressor septi / LLSAN spread",management:"Avoid if upper lip >1.8 cm"}
+],
+crossLinks:["gummy_smile","bunny_lines","nasal_flare"]
+},
+
+{id:"asymmetric_smile",name:"Asymmetric Smile",region:"mid",
+targets:["Zygomaticus major (ZMj) — inject HYPERACTIVE/more severe side only"],
+depth:"DEEP intramuscular.",
+landmark:"Deeply inject at midline between nasal ala and upper lip, along horizontal line passing through lateral canthus.",
+ethnicityNote:"Asian/Gulf Arab: modiolus is lower (below intercheilion line in 58.4%). ZMj fibers more vertical. Adjust injection point INFERIORLY.",
+doses:{
+ botox:{female:"2–4 U/side (affected side only)",male:"Same",note:"Facial palsy: inject NORMAL (non-paralyzed) side"},
+ dysport:{female:"5–12 s.U",male:"Same",note:"1:3 conversion"},
+ neuronox:{female:"2–4 U/side",male:"Same",note:"Same as Botox"}
+},
+technique:[
+"Pre-existing asymmetry: inject hyperactive/more severe side only.",
+"Facial palsy: inject NORMAL (non-paralyzed) side to reduce symmetry during dynamic movement.",
+"Location: midpoint between nasal ala and upper lip, horizontal at lateral canthus level.",
+"Depth: deep IM.",
+"Asian/Gulf Arab: modiolus positioned lower → adjust injection point inferiorly to account for longer, more vertical ZMj fibers."
+],
+vessels:[
+"Facial artery and zygomaticoorbital branches in this region. ⚑ Not formally mapped."
+],
+complications:[
+{name:"Awkward/new asymmetric smile",cause:"Applied to symmetric patient or wrong side",management:"No reversal; wait"},
+{name:"Lip ptosis",cause:"Excessive dose or spread",management:"Self-limiting up to 4 months"}
+],
+crossLinks:[]
+},
+
+{id:"perioral",name:"Perioral Lines (Smoker's Lines)",region:"lower",
+targets:["Orbicularis oris — SUPERFICIAL fibers only"],
+depth:"IMMEDIATE SUBDERMAL — visible superficial blebs. Do NOT reach deep functional fibers.",
+landmark:"4 points along vermilion border at 1/3 and 2/3 between philtrum border and mouth angle (upper lip). 2 points ~1 cm medial to commissures (lower lip, if needed).",
+ethnicityNote:"Asian: 2–4 U Botox total (vs 4–6 U Caucasian).",
+doses:{
+ botox:{female:"4–6 U total (Caucasian); 2–4 U (Asian)",male:"Same",note:"1–2 U/site. Upper lip ≤4 U; lower lip ≤2 U"},
+ dysport:{female:"10–15 s.U total",male:"Same",note:"2.5 s.U/site"},
+ neuronox:{female:"4–6 U total",male:"Same",note:"Same as Botox"}
+},
+technique:[
+"Screen for high-demand perioral professions (wind instrument musicians, professional speakers) → AVOID treatment.",
+"Upper lip: 4 evenly spaced points along vermilion border at 1/3 and 2/3 positions. AVOID midline Cupid's bow. AVOID lip corners.",
+"Lower lip (if needed): 2 points ~1 cm medial to oral commissures.",
+"Depth: immediate subdermal blebs only. Target superficial fibers. Spare deep functional layers.",
+"Aim for SUBTLE paresis — NOT freeze. Patient must still drink and speak.",
+"Counsel: retreatment every 2–3 months (highest-use facial zone; fastest return of lines).",
+"Static deep lines: combination with HA filler + laser/peel is necessary; toxin alone insufficient."
+],
+vessels:[
+"Superior and inferior labial arteries run submucosally within lips. ⚑ Not explicitly documented. Immediate subdermal technique is primary safeguard."
+],
+complications:[
+{name:"Functional impairment (p/b sounds, straw)",cause:"Excessive orbicularis weakening",management:"Self-limiting 2–4 weeks"},
+{name:"Lip ptosis/asymmetry",cause:"ZMj diffusion",management:"No reversal; accommodates in 2 weeks"},
+{name:"Thin-lipped appearance",cause:"Relaxation in long columella–vermilion patients",management:"Avoid in thin/atrophic lips"},
+{name:"Philtrum flattening",cause:"Midline injection",management:"Prevention: stay away from Cupid's bow"}
+],
+crossLinks:[]
+},
+
+{id:"dao",name:"Depressed Mouth Corners (DAO)",region:"lower",
+targets:["Depressor anguli oris (DAO) — triangular, thinnest lower-face muscle"],
+depth:"SUBDERMAL — very superficial. Use concentrated dilution to limit diffusion.",
+landmark:"Standard (Caucasian): 1 cm lateral + 1 cm inferior to commissure. 3-point technique: (1) below/lateral to commissure, (2) mid-commissure to jawline, (3) lateral upper fibers.",
+ethnicityNote:"Asian/Gulf Arab: inject inferior 1/3 of DAO near jawline origin (lower modiolus position). Avoid higher lateral injections.",
+doses:{
+ botox:{female:"2–5 U/side (or 4.5 U via 3-point: 1.5 U/point)",male:"Same",note:""},
+ dysport:{female:"5–15 s.U/side",male:"Same",note:""},
+ neuronox:{female:"2–5 U/side",male:"Same",note:"Same as Botox"}
+},
+technique:[
+"Confirm DAO: ask patient to pull corners down WITHOUT activating platysma.",
+"Standard Caucasian: inject 1 cm lateral + 1 cm inferior to commissure.",
+"3-point technique: (1) just below/lateral to commissure where skin dimples, (2) mid-commissure to jawline along DAO line, (3) lateral upper fibers. 1.5 U/point.",
+"Asian/Gulf Arab: inject inferior 1/3 of DAO at jawline origin (modiolus lower → higher injections riskier for smile symmetry).",
+"Depth: subdermal. Very superficial. Use concentrated dilution.",
+"Static marionette lines: combine with HA filler (toxin = dynamic; filler = volume).",
+"Nefertiti/platysma co-treatment (pars modiolaris) enhances corner lift further.",
+"Caution patients >60 with long philtrum: depressor relaxation may accentuate central upper lip drooping."
+],
+vessels:[
+"Facial artery courses just medial to DAO. ⚑ Not formally mapped. Stay lateral.",
+"Mental nerve exits mental foramen ~below 2nd premolar at mid-mandibular height. ⚑ Not formally mapped."
+],
+complications:[
+{name:"Lower lip ptosis",cause:"DLI (medial + deep to DAO) diffusion",management:"No reversal; stay lateral + low to prevent"},
+{name:"Asymmetric smile",cause:"ZMj or risorius spread",management:"Concentrated dilution; avoid too high or medial"}
+],
+crossLinks:["platysma_bands"]
+},
+
+{id:"mentalis",name:"Cobblestone Chin (Mentalis)",region:"lower",
+targets:["Mentalis (paired dome-shaped muscle)"],
+depth:"DEEP intramuscular — bone contact technique. Target depth ~9 mm (range 6.7–10.7 mm).",
+landmark:"1 cm lateral to mandibular symphysis (midline). Bone contact at periosteum → withdraw slightly → inject.",
+ethnicityNote:"Asian/Gulf Arab: stronger/thicker mentalis requires HIGHER dose: 3–6 U/side (6–12 U total).",
+doses:{
+ botox:{female:"3–5 U/side (4–10 U Caucasian total)",male:"3–5 U/side",note:""},
+ dysport:{female:"5–10 s.U/side (10–20 s.U total)",male:"Same",note:""},
+ neuronox:{female:"3–6 U/side (Asian)",male:"3–6 U/side",note:"Higher dose for Asian/Gulf Arab patients"}
+},
+technique:[
+"Confirm mentalis activation: ask forceful pout / lower lip elevation → cobblestoning marks muscle boundaries.",
+"Palpate dome-shaped muscle mass during contraction.",
+"Identify mandibular symphysis (midline). Inject 1 cm lateral to midline.",
+"Bone contact technique: insert needle to periosteum, withdraw slightly, then inject. Depth ~9 mm.",
+"4-point alternative: deep points (3–4 U, 1 cm lateral to midline along mandible) + shallow points (1–2 U, 1–2 cm superior to jawline, 1 cm lateral to midline).",
+"Target 'prominence of chin' (most distal from orbicularis oris).",
+"STAY WITHIN 1 cm of midline at all times. Lateral injection = DLI paralysis.",
+"Do NOT inject superiorly toward orbicularis oris — lip incompetence risk."
+],
+vessels:[
+"Mental foramen (mental nerve + mental artery) lies within or adjacent to injection zone. ⚑ Not formally mapped. Palpate foramen pre-injection (approx. below 2nd premolar). Bone-contact technique reduces but does not eliminate risk."
+],
+complications:[
+{name:"Lower lip ptosis",cause:"DLI spread (too lateral)",management:"Stay within 1 cm of midline; no reversal"},
+{name:"Lip incompetence",cause:"Too superior toward orbicularis oris",management:"Target distal chin prominence only"}
+],
+crossLinks:[]
+},
+
+{id:"masseter",name:"Masseter Slimming / Bruxism",region:"lower",
+targets:["Masseter — lower one-third (thickest overlap of all three layers)"],
+depth:"DEEP intramuscular — bone contact, then retrograde layer-by-layer withdrawal.",
+landmark:"Safe zone: below earlobe–cheilion line, ≥1 cm above mandibular border, within palpable masseter margins during clenching.",
+ethnicityNote:"Asian patients frequently request aggressive dosing (40 U/side Neuronox). Confirm muscle-dominant widening vs bony — toxin ineffective for bony widening.",
+doses:{
+ botox:{female:"10–25 U/side",male:"25–40 U/side",note:"20 U for 3–5 cm width. >5 cm male: 25–40 U. Risorius+: <10 U/side."},
+ dysport:{female:"60–100 s.U/side",male:"100–140 s.U/side",note:"Up to 75 U/side in severe hypertrophy trials"},
+ neuronox:{female:"20–40 U/side",male:"40 U/side",note:"Minimum effective dose: 20 U"}
+},
+technique:[
+"RISORIUS TEST FIRST: ask broad smile. If ears move upward/backward = developed risorius → LIMIT to <10 U/side.",
+"Confirm muscle-dominant widening by palpation during clenching (ideal: >1.3 cm thickness on CT/US).",
+"Delineate safe zone: inferior to earlobe–cheilion line, ≥1 cm above mandibular border, within palpable masseter margins.",
+"Patient clenches during injection — palpate and confirm position.",
+"Insert needle PERPENDICULARLY until contacting mandibular bone (periosteum), withdraw slightly.",
+"RETROGRADE layer-by-layer injection while withdrawing: covers deep + middle + superficial layers (overcomes DIT diffusion barrier).",
+"3–4 injection points spaced ~1 cm in lower-third safe zone.",
+"NEVER inject above earlobe–cheilion line (parotid duct + risorius = at risk above this)."
+],
+vessels:[
+"Facial artery courses immediately anterior to masseter (anterior border). ⚑ Not formally mapped — anterior injection boundary must protect it. Palpate facial artery pulsation pre-injection.",
+"Parotid (Stensen's) duct exits parotid at approximately earlobe–cheilion line — injection above this line risks duct injury."
+],
+complications:[
+{name:"Paradoxical bulging (chipmunk cheeks)",cause:"Deep fibers paralyzed; superficial hyper-contract; DIT barrier",management:"Inject targeted micro-dose into bulging fibers directly"},
+{name:"Asymmetric smile / reduced mouth width",cause:"Risorius diffusion",management:"Self-limiting 3–4 months; risorius test prevents"},
+{name:"Prominent cheekbones",cause:"Masseter atrophy unmasks high cheekbones",management:"Manage expectations; filler later if needed"},
+{name:"Masticatory weakness",cause:"Overdose",management:"Temporary 1–3 months; warn patient pre-treatment"},
+{name:"Xerostomia (dry mouth)",cause:"Parotid/submandibular gland spread",management:"Salivary substitutes + hydration"}
+],
+crossLinks:["temporalis"]
+},
+
+{id:"platysma_bands",name:"Platysmal Bands",region:"neck",
+targets:["Platysma — vertical cords / hypertrophic bands"],
+depth:"SUPERFICIAL intramuscular. PINCH TECHNIQUE MANDATORY.",
+landmark:"3–4 points per band from inferior mandibular border to clavicle. Spaced 1.5–2.0 cm along contracted band.",
+ethnicityNote:null,
+doses:{
+ botox:{female:"2–3 U/point (10–20 U/band)",male:"Same",note:"ABSOLUTE MAX: 40–50 U total neck per session"},
+ dysport:{female:"5–10 s.U/point (~20 s.U/band)",male:"Same",note:"Max total dose rule still applies"},
+ neuronox:{female:"2–3 U/point",male:"Same",note:"Same as Botox"}
+},
+technique:[
+"IDEAL CANDIDATE: distinct active bands + good cervical skin elasticity + minimal submental fat.",
+"POOR CANDIDATE: excessive submental fat or profound skin laxity → will not benefit; may worsen appearance.",
+"PINCH TECHNIQUE: physically pinch skin and muscle AWAY FROM NECK before each injection. Isolates platysma from underlying strap muscles and deglutition structures.",
+"3–4 injection points per band from inferior mandibular border to clavicle. Space 1.5–2.0 cm apart.",
+"Depth: superficial intramuscular only. NEVER go deep.",
+"Maximum 40–50 U Botox total for entire neck per session regardless of number of bands."
+],
+vessels:[
+"External jugular vein: runs obliquely across platysma. ⚑ Not formally mapped.",
+"Anterior jugular vein: medial. ⚑ Not formally mapped.",
+"Internal jugular, carotid artery, vagus nerve: in carotid triangle — at risk with ANY deep injection.",
+"⚠ NO FORMAL VESSEL MAPPING documented for neck. Pinch technique is the ONLY documented safeguard."
+],
+complications:[
+{name:"Dysphagia",cause:"Deep injection → strap muscle / deglutition paralysis",management:"Potentially dangerous; no reversal; supportive; prevent with pinch technique"},
+{name:"Hoarseness / voice alteration",cause:"Deep diffusion to laryngeal area",management:"Supportive; resolves with time"},
+{name:"Cervical weakness",cause:"Deep diffusion to anterior cervical muscles",management:"Supportive"}
+],
+crossLinks:["dao"]
+},
+
+{id:"nefertiti",name:"Nefertiti Jawline Lift",region:"neck",
+targets:["Platysma — upper fibers along mandibular and submandibular lines","Pars modiolaris (posterolateral to DAO) — for mouth corner enhancement"],
+depth:"SUBDERMAL / intradermal — superficial dermal blebs/wheals.",
+landmark:"Line 1 (Mandibular): 3 sites, 2 cm apart along jawline. Line 2 (Submandibular): 4 sites, 2 cm below jawline. Spacing: 2.0 cm all sites.",
+ethnicityNote:null,
+doses:{
+ botox:{female:"2 U/point (14–18 U total per side)",male:"Same",note:"ABSOLUTE MAX: 40–50 U total neck per session (combined with bands if treating both)"},
+ dysport:{female:"~6 s.U/point per site",male:"Same",note:"1:3 conversion ratio"},
+ neuronox:{female:"2 U/point",male:"Same",note:"Same as Botox"}
+},
+technique:[
+"Same patient selection rules as platysmal bands: good skin elasticity + minimal submental fat mandatory.",
+"Line 1: 3 intradermal bleb injections, 2 cm apart, along mandibular border.",
+"Line 2: 4 intradermal bleb injections, 2 cm apart, 2 cm BELOW mandibular border.",
+"Depth: subdermal / intradermal blebs only. NOT deep injection.",
+"If also treating platysmal bands: total combined neck dose must not exceed 40–50 U Botox per session.",
+"Combination with DAO treatment enhances mouth corner lift (weakening pars modiolaris + DAO = synergistic effect)."
+],
+vessels:[
+"External jugular vein: runs obliquely across platysma. ⚑ Not formally mapped.",
+"Anterior jugular vein: medial. ⚑ Not formally mapped.",
+"⚠ NO FORMAL VESSEL MAPPING documented for neck region."
+],
+complications:[
+{name:"Dysphagia",cause:"Deep injection (non-bleb technique)",management:"No reversal; prevent with strict subdermal depth"},
+{name:"Results masked",cause:"Excessive submental fat or skin laxity",management:"Patient selection failure — address pre-procedure"}
+],
+crossLinks:["dao","platysma_bands"]
+}
+]};
+
+// ═══════════════════════════════════════════════════════════
+// STATE & HELPERS
+// ═══════════════════════════════════════════════════════════
+let sex='female';
+const areaOrder=DATA.areas.map(a=>a.id);
+const areaMap={};DATA.areas.forEach(a=>areaMap[a.id]=a);
+const regionLabels={upper:"Upper Face",mid:"Midface",lower:"Lower Face",neck:"Neck"};
+
+function sel(id){return document.getElementById(id)}
+function getChecked(){return [...document.querySelectorAll('.chip-grid input:checked')].map(c=>c.value)}
+function setSex(btn){
+ btn.parentNode.querySelectorAll('.toggle-btn').forEach(b=>b.classList.remove('active'));
+ btn.classList.add('active');sex=btn.dataset.val;
+}
+function updateCounts(){
+ const groups={upper:0,mid:0,lower:0,neck:0};
+ document.querySelectorAll('.chip-grid').forEach(g=>{
+  const grp=g.dataset.group;
+  const n=[...g.querySelectorAll('input:checked')].length;
+  groups[grp]=n;
+ });
+ sel('cntUpper').textContent=groups.upper;
+ sel('cntMid').textContent=groups.mid;
+ sel('cntLower').textContent=groups.lower;
+ sel('cntNeck').textContent=groups.neck;
+ const total=Object.values(groups).reduce((a,b)=>a+b,0);
+ sel('countBadge').textContent=total+' area'+(total!==1?'s':'');
+}
+document.querySelectorAll('.chip-grid input').forEach(cb=>cb.addEventListener('change',updateCounts));
+
+function clearAll(){
+ document.querySelectorAll('.chip-grid input,.flag-list input').forEach(c=>c.checked=false);
+ updateCounts();
+ sel('resultsWrap').classList.remove('show');
+ sel('pholder').style.display='flex';
+ sel('genErr').style.display='none';
+}
+
+function toggleAll(open){
+ document.querySelectorAll('#cardsContainer .card, #summaryContainer .card').forEach(c=>{
+  if(open)c.classList.add('open');else c.classList.remove('open');
+ });
+}
+
+// ═══════════════════════════════════════════════════════════
+// GENERATE
+// ═══════════════════════════════════════════════════════════
+function generate(){
+ const checked=getChecked();
+ if(!checked.length){
+  sel('genErr').style.display='block';
+  const b=sel('genBtn');b.classList.add('shake');setTimeout(()=>b.classList.remove('shake'),450);
+  return;
+ }
+ sel('genErr').style.display='none';
+ const eth=sel('ethSelect').value;
+ const toxin=sel('toxinSelect').value;
+ const flags={
+  naive:sel('flagNaive').checked,
+  longLip:sel('flagLongLip').checked,
+  risorius:sel('flagRisorius').checked,
+  submental:sel('flagSubmental').checked,
+  surgery:sel('flagSurgery').checked,
+  perioral:sel('flagPerioral').checked,
+  asianMod:sel('flagAsianMod').checked
+ };
+ const has=id=>checked.includes(id);
+
+ // ALERTS
+ let alerts=[];
+ if(has('forehead')&&!has('glabella'))alerts.push({type:'red',text:'⚠ BROW PTOSIS RISK: Frontalis selected without glabella. Must treat glabella simultaneously or stage glabella first.'});
+ if(flags.longLip&&(has('gummy_smile')||has('nasal_flare')||has('nasal_tip')))alerts.push({type:'red',text:'🚫 CONTRAINDICATED: Upper lip length >1.8 cm. Do not treat perinasal lip elevators.'});
+ if(has('platysma_bands')||has('nefertiti'))alerts.push({type:'red',text:'⚠ NECK SAFETY: Pinch technique mandatory. Max 40–50 U Botox total neck per session. Deep injection = dysphagia risk.'});
+ if(flags.risorius&&has('masseter'))alerts.push({type:'red',text:'⚠ RISORIUS ALERT: Limit masseter dose to <10 U/side. Risk of asymmetric smile.'});
+
+ if(has('crows_feet'))alerts.push({type:'amber',text:'↩ CASCADE: Crow\'s feet treatment may unmask bunny lines. Consider adding 1–2 U to inferior medial canthus.'});
+ if(has('brow_lift')&&!has('glabella'))alerts.push({type:'amber',text:'⚠ Medial glabella release required for brow lift. Lateral-only = Mephisto deformity.'});
+ const llsanAreas=['gummy_smile','nasal_flare','nasal_tip','bunny_lines'];
+ if(llsanAreas.filter(a=>has(a)).length>=2)alerts.push({type:'amber',text:'⚑ LLSAN DOSE STACKING: Multiple LLSAN-targeting areas selected. Coordinate total cumulative LLSAN dose. Recommended ceiling: ≤4–6 U Botox combined across all perinasal indications.'});
+ if(has('masseter')&&has('temporalis'))alerts.push({type:'amber',text:'ℹ COMBO: Masseter + Temporalis co-treatment. Monitor for TMJ adaptive pain post-procedure.'});
+ if(has('dao'))alerts.push({type:'amber',text:'ℹ COMBINATION: For deep static marionette lines, combine DAO neurotoxin with HA filler. Toxin addresses dynamic component only.'});
+ if(flags.naive)alerts.push({type:'amber',text:'ℹ NAÏVE PATIENT: Use minimum dose for all selected areas. Reassess at 2-week follow-up before titrating.'});
+
+ // Render alerts
+ sel('alertsContainer').innerHTML=alerts.map(a=>`<div class="alert-bar ${a.type}"><span class="alert-icon">${a.type==='red'?'🔴':'🟡'}</span><span>${a.text}</span></div>`).join('');
+
+ // Render cards in order
+ const ordered=areaOrder.filter(id=>has(id));
+ sel('cardsContainer').innerHTML=ordered.map(id=>renderCard(areaMap[id],eth,toxin,sex,flags)).join('');
+
+ // Cross-indication summary
+ let crossRows=[];
+ ordered.forEach(id=>{
+  const a=areaMap[id];
+  a.crossLinks.forEach(lid=>{
+   if(!has(lid)){
+    crossRows.push({area:a.name,linked:areaMap[lid]?areaMap[lid].name:lid,action:'Consider co-treatment or staged approach'});
+   }
+  });
+ });
+ let sumHtml='<div class="card open"><div class="card-head" onclick="this.parentNode.classList.toggle(\'open\')"><span class="card-name">Cross-Indication Summary</span><span class="region-badge">OVERVIEW</span></div><div class="card-body" style="padding:14px 16px">';
+ if(crossRows.length){
+  sumHtml+='<table class="summary-tbl"><tr><th>Selected Area</th><th>Linked Requirement</th><th>Action</th></tr>';
+  crossRows.forEach(r=>sumHtml+=`<tr><td>${r.area}</td><td>${r.linked}</td><td>${r.action}</td></tr>`);
+  sumHtml+='</table>';
+ } else {
+  sumHtml+='<div style="color:var(--muted)">No additional cross-indication rules triggered.</div>';
+ }
+ sumHtml+='</div></div>';
+ sel('summaryContainer').innerHTML=sumHtml;
+
+ sel('pholder').style.display='none';
+ const rw=sel('resultsWrap');rw.classList.add('show');
+ rw.scrollTop=0;
+ sel('rightPanel').scrollTo({top:0,behavior:'smooth'});
+}
+
+function renderCard(a,eth,toxin,sex,flags){
+ const uid=a.id+'_'+Math.random().toString(36).slice(2,6);
+ const isAsian=eth==='asian';
+ const tabIds=['tgt','dose','tech','safe'].map(t=>uid+'_'+t);
+
+ // Tab 1: Target & Depth
+ let t1='<div>';
+ t1+='<div style="margin-bottom:6px"><strong style="color:var(--muted);font-size:11px">TARGET MUSCLES</strong></div>';
+ a.targets.forEach(m=>t1+=`<span class="badge-muscle">${m}</span> `);
+ t1+=`<div style="margin-top:10px"><strong style="color:var(--muted);font-size:11px">DEPTH RULE</strong></div><div class="depth-chip">${a.depth}</div>`;
+ t1+=`<div style="margin-top:10px"><strong style="color:var(--muted);font-size:11px">KEY LANDMARK</strong></div><div style="margin-top:4px">${a.landmark}</div>`;
+ if(isAsian&&a.ethnicityNote)t1+=`<div class="cyan-box">🌏 ${a.ethnicityNote}</div>`;
+ t1+='</div>';
+
+ // Tab 2: Doses
+ let t2='';
+ if(flags.naive)t2+=`<div class="green-banner">✅ Start at minimum dose. Reassess at 2 weeks.</div>`;
+ t2+=`<table class="dose-tbl"><tr><th>Drug</th><th>${sex==='female'?'<strong>Female</strong>':'Female'}</th><th>${sex==='male'?'<strong>Male</strong>':'Male'}</th><th>Note</th></tr>`;
+ const toxinOrder=['botox','dysport','neuronox'];
+ const toxinNames={botox:'Botox® / Xeomin®',dysport:'Dysport®',neuronox:'Neuronox'};
+ toxinOrder.forEach(tk=>{
+  const d=a.doses[tk];if(!d)return;
+  const cls=tk===toxin?'hl':'dim';
+  t2+=`<tr class="${cls}"><td>${toxinNames[tk]}</td><td>${d.female}</td><td>${d.male}</td><td>${d.note}</td></tr>`;
+ });
+ t2+='</table>';
+
+ // Tab 3: Technique
+ let t3='<ol>';
+ a.technique.forEach(s=>t3+=`<li>${s}</li>`);
+ t3+='</ol>';
+ if(isAsian&&a.ethnicityNote)t3+=`<div class="cyan-box">🌏 Ethnicity note: ${a.ethnicityNote}</div>`;
+
+ // Tab 4: Safety
+ let t4=`<div class="amber-hdr">⚠ Danger Zones / Vessels</div>`;
+ a.vessels.forEach(v=>t4+=`<div class="vessel-item">• ${v}</div>`);
+ t4+=`<div class="red-hdr" style="margin-top:12px">⛔ Complications</div>`;
+ t4+='<table class="dose-tbl"><tr><th>Complication</th><th>Cause</th><th>Management</th></tr>';
+ a.complications.forEach(c=>t4+=`<tr><td>${c.name}</td><td>${c.cause}</td><td>${c.management}</td></tr>`);
+ t4+='</table>';
+
+ const tabs=[{id:tabIds[0],label:'Target & Depth',html:t1},{id:tabIds[1],label:'Doses',html:t2},{id:tabIds[2],label:'Technique',html:t3},{id:tabIds[3],label:'Safety',html:t4}];
+
+ let html=`<div class="card open" role="region" aria-label="${a.name}">`;
+ html+=`<div class="card-head" onclick="this.parentNode.classList.toggle('open')"><span class="card-name">${a.name}</span><span class="region-badge">${regionLabels[a.region]}</span></div>`;
+ html+=`<div class="card-body">`;
+ html+=`<div class="tab-row">`;
+ tabs.forEach((t,i)=>html+=`<button class="tab-btn${i===0?' active':''}" onclick="switchTab(this,'${t.id}')" tabindex="0">${t.label}</button>`);
+ html+=`</div>`;
+ tabs.forEach((t,i)=>html+=`<div class="tab-content${i===0?' active':''}" id="${t.id}">${t.html}</div>`);
+ html+=`</div></div>`;
+ return html;
+}
+
+function switchTab(btn,id){
+ const card=btn.closest('.card-body');
+ card.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+ card.querySelectorAll('.tab-content').forEach(c=>c.classList.remove('active'));
+ btn.classList.add('active');
+ card.querySelector('#'+id).classList.add('active');
+}
+</script>
+</body>
+</html>
